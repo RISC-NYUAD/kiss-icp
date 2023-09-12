@@ -57,6 +57,7 @@ OdometryServer::OdometryServer(const rclcpp::NodeOptions &options)
     odom_frame_ = declare_parameter<std::string>("odom_frame", odom_frame_);
     publish_alias_tf_ = declare_parameter<bool>("publish_alias_tf", publish_alias_tf_);
     publish_odom_tf_ = declare_parameter<bool>("publish_odom_tf", publish_odom_tf_);
+    invert_tf_ = declare_parameter<bool>("invert_tf", invert_tf_);
     config_.max_range = declare_parameter<double>("max_range", config_.max_range);
     config_.min_range = declare_parameter<double>("min_range", config_.min_range);
     config_.deskew = declare_parameter<bool>("deskew", config_.deskew);
@@ -144,13 +145,25 @@ void OdometryServer::RegisterFrame(const sensor_msgs::msg::PointCloud2::ConstSha
         transform_msg.header.stamp = msg->header.stamp;
         transform_msg.header.frame_id = odom_frame_;
         transform_msg.child_frame_id = child_frame_;
-        transform_msg.transform.rotation.x = q_current.x();
-        transform_msg.transform.rotation.y = q_current.y();
-        transform_msg.transform.rotation.z = q_current.z();
-        transform_msg.transform.rotation.w = q_current.w();
-        transform_msg.transform.translation.x = t_current.x();
-        transform_msg.transform.translation.y = t_current.y();
-        transform_msg.transform.translation.z = t_current.z();
+
+        Sophus::SE3d pose_tf = pose;
+
+        if (invert_tf_) {
+            pose_tf = pose.inverse();
+            transform_msg.child_frame_id = odom_frame_;
+            transform_msg.header.frame_id = child_frame_;
+        }
+
+        const Eigen::Vector3d t_current_tf = pose_tf.translation();
+        const Eigen::Quaterniond q_current_tf = pose_tf.unit_quaternion();
+
+        transform_msg.transform.rotation.x = q_current_tf.x();
+        transform_msg.transform.rotation.y = q_current_tf.y();
+        transform_msg.transform.rotation.z = q_current_tf.z();
+        transform_msg.transform.rotation.w = q_current_tf.w();
+        transform_msg.transform.translation.x = t_current_tf.x();
+        transform_msg.transform.translation.y = t_current_tf.y();
+        transform_msg.transform.translation.z = t_current_tf.z();
         tf_broadcaster_->sendTransform(transform_msg);
     }
 
