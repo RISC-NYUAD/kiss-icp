@@ -69,6 +69,8 @@ OdometryServer::OdometryServer(const rclcpp::NodeOptions &options)
         RCLCPP_WARN(get_logger(), "[WARNING] max_range is smaller than min_range, settng min_range to 0.0");
         config_.min_range = 0.0;
     }
+    declare_parameter<double>("position_covariance", 0.1);
+    declare_parameter<double>("orientation_covariance", 0.1);
     // clang-format on
 
     // Construct the main KISS-ICP odometry node
@@ -186,6 +188,17 @@ void OdometryServer::RegisterFrame(const sensor_msgs::msg::PointCloud2::ConstSha
     odom_msg->header = pose_msg.header;
     odom_msg->child_frame_id = child_frame_;
     odom_msg->pose.pose = pose_msg.pose;
+
+    double position_covariance = get_parameter("position_covariance").as_double(),
+           orientation_covariance = get_parameter("orientation_covariance").as_double();
+
+    odom_msg->pose.covariance[0] = position_covariance;
+    odom_msg->pose.covariance[7] = position_covariance;
+    odom_msg->pose.covariance[14] = position_covariance;
+    odom_msg->pose.covariance[21] = orientation_covariance;
+    odom_msg->pose.covariance[28] = orientation_covariance;
+    odom_msg->pose.covariance[35] = orientation_covariance;
+
     odom_publisher_->publish(std::move(odom_msg));
 
     // Publish KISS-ICP internal data, just for debugging
